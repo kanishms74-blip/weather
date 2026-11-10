@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Weather Intelligence</title>
+
+<!-- External libraries: charts + interactive map -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="weather-validation.js"></script>
+
+<style>
+:root{
+  --bg:#07131d; --panel:#0d1e2b; --panel2:#102638; --line:#244457;
+  --text:#eef8ff; --muted:#8faabd; --cyan:#36d6e7; --blue:#4e9dff;
+  --green:#55d68a; --amber:#ffc857; --red:#ff7272; --shadow:0 18px 50px rgba(0,0,0,.25);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;color:var(--text);
+  background:radial-gradient(circle at 75% 0%,#123b50 0,transparent 30%),
+             linear-gradient(145deg,#061019,#0a1c29 55%,#07131d);
+  min-height:100vh;
+}
+button,input,select{font:inherit}
+button{cursor:pointer}
+.app{display:grid;grid-template-columns:255px 1fr;min-height:100vh}
+.sidebar{
+  position:sticky;top:0;height:100vh;padding:24px 16px;border-right:1px solid var(--line);
+  background:rgba(5,17,27,.88);backdrop-filter:blur(16px);z-index:5;
+}
+.brand{display:flex;align-items:center;gap:11px;margin:0 8px 28px}
+.brand-icon{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;
+  background:linear-gradient(135deg,var(--cyan),var(--blue));font-size:22px}
+.brand strong{font-size:18px}.brand small{display:block;color:var(--muted);margin-top:2px}
+.nav a{
+  display:block;padding:12px 13px;margin:5px 0;border-radius:11px;color:#b7cad6;
+  text-decoration:none;font-size:14px
+}
+.nav a:hover,.nav a.active{background:#123246;color:#fff}
+.main{min-width:0;padding:24px 28px 42px}
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:20px}
+.title h1{font-size:28px;margin:0 0 5px;letter-spacing:-.04em}
+.title p{margin:0;color:var(--muted);font-size:13px}
+.live{display:flex;align-items:center;gap:7px;color:#a9f0c6;font-size:12px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 12px var(--green)}
+.searchbar{display:grid;grid-template-columns:1fr 125px 125px;gap:10px;margin-bottom:18px}
+input,select{
+  width:100%;padding:13px 14px;border-radius:11px;border:1px solid var(--line);
+  background:#0a1925;color:var(--text);outline:none
+}
+input:focus,select:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(54,214,231,.1)}
+.btn{border:0;border-radius:11px;padding:13px 15px;font-weight:700;color:#03141b;
+  background:linear-gradient(135deg,var(--cyan),#62aaff)}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.btn.secondary{background:#173347;color:#dff7ff;border:1px solid var(--line)}
+.status{min-height:18px;color:var(--muted);font-size:12px;margin:0 0 12px}
+.grid{display:grid;gap:16px}
+.hero{display:grid;grid-template-columns:1.6fr .9fr;gap:16px}
+.card{
+  background:linear-gradient(145deg,rgba(14,32,46,.95),rgba(10,25,37,.96));
+  border:1px solid var(--line);border-radius:17px;padding:19px;box-shadow:var(--shadow)
+}
+.location-card{background:linear-gradient(135deg,#104052,#0b2738)}
+.location-line{display:flex;justify-content:space-between;gap:15px;align-items:center}
+.location-name{font-size:26px;font-weight:800;letter-spacing:-.04em}
+.meta{color:#a7c1cf;font-size:12px;margin-top:6px}
+.weather-big{font-size:56px;font-weight:800;margin-top:16px}
+.weather-big span{font-size:18px;color:#a7c1cf;font-weight:500}
+.desc{color:#d3e7ef;margin-top:2px}
+.badges{display:flex;gap:7px;flex-wrap:wrap;margin-top:15px}
+.badge{font-size:11px;border:1px solid #31566b;border-radius:999px;padding:6px 9px;color:#bfe4ed;background:#0a2431}
+.map{height:240px;border-radius:13px;overflow:hidden;border:1px solid var(--line);margin-top:12px}
+.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:11px}
+.kpi{padding:15px;border:1px solid var(--line);border-radius:14px;background:#0b1b27}
+.kpi small{color:var(--muted);font-size:11px}.kpi strong{display:block;margin-top:8px;font-size:21px}
+.section-title{display:flex;justify-content:space-between;align-items:end;gap:12px;margin-bottom:13px}
+.section-title h2{font-size:18px;margin:0}.section-title p{margin:0;color:var(--muted);font-size:11px}
+.chartbox{height:330px}.chartbox.tall{height:390px}
+.controls{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.moment-controls{display:grid;grid-template-columns:minmax(180px,1fr) minmax(140px,.6fr) auto;gap:10px;margin-top:16px}
+.control label{display:block;color:var(--muted);font-size:11px;margin:0 0 6px}
+.field-error{display:block;min-height:0;color:var(--red);font-size:11px;line-height:1.4;margin-top:5px}
+.field-error:empty{display:none}
+.analysis-grid{display:grid;grid-template-columns:1.4fr .6fr;gap:16px}
+.analysis{
+  border-left:4px solid var(--cyan);background:#0b2633;padding:17px;border-radius:11px;
+  color:#d6eaf2;line-height:1.65;font-size:13px
+}
+.risk-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}
+.risk{padding:13px;border:1px solid var(--line);border-radius:11px;background:#0a1b27}
+.risk span{display:block;color:var(--muted);font-size:11px}.risk b{display:block;margin-top:5px}
+.good{color:var(--green)}.warn{color:var(--amber)}.bad{color:var(--red)}
+.forecast{display:grid;grid-template-columns:repeat(8,1fr);gap:9px}
+.day{padding:12px;border:1px solid var(--line);border-radius:12px;background:#0b1b27}
+.day b{font-size:12px}.day .icon{font-size:25px;margin:12px 0 5px}.day .temp{font-size:17px;font-weight:800}.day small{color:var(--muted);line-height:1.6}
+.table-wrap{overflow:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th,td{padding:10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{color:#9fc0cf;font-weight:600}
+.empty{padding:28px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:12px}
+footer{margin-top:26px;text-align:center;color:#718b9b;font-size:11px;line-height:1.6}
+@media(max-width:1100px){.app{grid-template-columns:75px 1fr}.sidebar{padding:20px 9px}.brand div:last-child,.nav a span,.side-note{display:none}.brand{justify-content:center;margin:0 0 20px}.nav a{text-align:center}.hero{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(3,1fr)}.forecast{grid-template-columns:repeat(4,1fr)}}
+@media(max-width:750px){.app{display:block}.sidebar{position:relative;height:auto;padding:10px;border-right:0;border-bottom:1px solid var(--line)}.brand{margin:0}.nav{display:flex;overflow:auto}.nav a{white-space:nowrap}.nav a span{display:inline}.side-note{display:none}.main{padding:16px}.searchbar{grid-template-columns:1fr 1fr}.searchbar input{grid-column:1/-1}.controls,.moment-controls{grid-template-columns:1fr 1fr}.analysis-grid{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(2,1fr)}.forecast{grid-template-columns:repeat(2,1fr)}.location-name{font-size:21px}}
+@media(max-width:450px){.controls,.kpis,.forecast{grid-template-columns:1fr}.topbar{align-items:flex-start;flex-direction:column}}
+</style>
+</head>
+
+<body>
+<div class="app">
+<aside class="sidebar">
+  <div class="brand"><div class="brand-icon">🌦</div><div><strong>Weather Intelligence</strong><small>Global climate insights</small></div></div>
+  <nav class="nav">
+    <a class="active" href="#overview">◉ <span>Overview</span></a>
+    <a href="#history">◷ <span>Historical Analysis</span></a>
+    <a href="#forecast">☀ <span>Forecast</span></a>
+    <a href="#trends">⌁ <span>Climate Trends</span></a>
+    <a href="#mapSection">⌖ <span>Global Map</span></a>
+  </nav>
+</aside>
+
+<main class="main">
+  <div class="topbar">
+    <div class="title"><h1>Global Weather Intelligence</h1><p>Historical moments • current conditions • forecast • climate trend analysis</p></div>
+    <div class="live"><i class="dot"></i> LIVE DATA MODE</div>
+  </div>
+
+  <div class="searchbar">
+    <input id="placeInput" placeholder="Search any city, district, state, country or place — e.g. Coimbatore, Tokyo, London">
+    <button class="btn" onclick="searchPlace()">🔎 Analyze</button>
+    <button class="btn secondary" onclick="useGPS()">📍 My Location</button>
+  </div>
+  <div id="status" class="status">Search a location to begin.</div>
+
+  <section id="overview" class="grid">
+    <div class="hero">
+      <div class="card location-card">
+        <div class="location-line">
+          <div><div id="placeName" class="location-name">No location selected</div><div id="placeMeta" class="meta">Global location intelligence</div></div>
+          <div id="currentIcon" style="font-size:48px">🌍</div>
+        </div>
+        <div id="currentTemp" class="weather-big">-- <span>°C</span></div>
+        <div id="currentDesc" class="desc">Search a place for live weather.</div>
+        <div class="badges">
+          <div id="countryBadge" class="badge">Country: --</div>
+          <div id="adminBadge" class="badge">Region: --</div>
+          <div id="coordBadge" class="badge">Coordinates: --</div>
+        </div>
+      </div>
+      <div class="card" id="mapSection">
+        <div class="section-title"><h2>📍 Observation Map</h2><p>Global coordinates</p></div>
+        <div id="map" class="map"></div>
+      </div>
+    </div>
+
+    <div class="kpis">
+      <div class="kpi"><small>Feels Like</small><strong id="feels">--</strong></div>
+      <div class="kpi"><small>Humidity</small><strong id="humidity">--</strong></div>
+      <div class="kpi"><small>Wind</small><strong id="wind">--</strong></div>
+      <div class="kpi"><small>Pressure</small><strong id="pressure">--</strong></div>
+      <div class="kpi"><small>Cloud Cover</small><strong id="cloud">--</strong></div>
+      <div class="kpi"><small>Rain Now</small><strong id="rainNow">--</strong></div>
+    </div>
+  </section>
+
+  <section class="card" style="margin-top:16px">
+    <div class="section-title"><h2>📊 Atmospheric Profile</h2><p>Next 72 hours</p></div>
+    <div class="chartbox"><canvas id="hourlyChart"></canvas></div>
+  </section>
+
+  <section id="history" class="card" style="margin-top:16px">
+    <div class="section-title"><h2>🕘 Historical Weather Explorer</h2><p>Past observations / reanalysis</p></div>
+    <div class="controls">
+      <div class="control"><label for="histStart">Start date</label><input type="date" id="histStart" aria-describedby="histStartError"><small class="field-error" id="histStartError"></small></div>
+      <div class="control"><label for="histEnd">End date</label><input type="date" id="histEnd" aria-describedby="histEndError"><small class="field-error" id="histEndError"></small></div>
+      <div class="control"><label>Analysis type</label>
+        <select id="histType"><option value="hourly">Hourly moments</option><option value="daily">Daily summary</option></select>
+      </div>
+      <div class="control" style="display:flex;align-items:end"><button class="btn" id="analyzePastButton" style="width:100%" onclick="loadHistory()" disabled>Analyze Past</button></div>
+    </div>
+    <div id="historyDateHelp" class="status" aria-live="polite"></div>
+    <div class="moment-controls">
+      <div class="control"><label for="histMomentDate">Specific past date</label><input type="date" id="histMomentDate" aria-describedby="histMomentDateError"><small class="field-error" id="histMomentDateError"></small></div>
+      <div class="control"><label for="histMomentTime">Local time</label><input type="time" id="histMomentTime" value="12:00" step="3600" aria-describedby="histMomentTimeError"><small class="field-error" id="histMomentTimeError"></small></div>
+      <div class="control" style="display:flex;align-items:end"><button class="btn secondary" id="analyzeHourButton" style="width:100%" onclick="analyzeHistoricalMoment()" disabled>Analyze this hour</button></div>
+    </div>
+    <div id="historyMoment" class="analysis" style="margin-top:12px" aria-live="polite">Select a location, date, and time to inspect a past weather observation.</div>
+    <div id="historyMessage" class="status" style="margin-top:12px"></div>
+    <div class="chartbox tall"><canvas id="historyChart"></canvas></div>
+    <div id="historyTable" style="margin-top:14px"></div>
+  </section>
+
+  <section id="forecast" class="card" style="margin-top:16px">
+    <div class="section-title"><h2>🔮 16-Day Forecast Intelligence</h2><p>Model forecast — uncertainty increases with horizon</p></div>
+    <div id="forecastGrid" class="forecast"><div class="empty">Search a location to load the forecast.</div></div>
+  </section>
+
+  <section id="trends" class="card" style="margin-top:16px">
+    <div class="section-title"><h2>📈 Climate Trend Analyzer</h2><p>Compare yearly temperature and rainfall patterns</p></div>
+    <div class="controls">
+      <div class="control"><label>Trend start year</label><input type="number" id="trendStart" min="1940" max="2100" value="2000"></div>
+      <div class="control"><label>Trend end year</label><input type="number" id="trendEnd" min="1940" max="2100" value="2025"></div>
+      <div class="control"><label>Metric</label>
+        <select id="trendMetric"><option value="temp">Mean temperature</option><option value="rain">Annual precipitation</option></select>
+      </div>
+      <div class="control" style="display:flex;align-items:end"><button class="btn" style="width:100%" onclick="loadTrend()">Run Trend</button></div>
+    </div>
+    <div id="trendMessage" class="status" style="margin-top:12px"></div>
+    <div class="chartbox tall"><canvas id="trendChart"></canvas></div>
+  </section>
+
+  <section class="analysis-grid" style="margin-top:16px">
+    <div class="card">
+      <div class="section-title"><h2>🧠 Automated Weather Analysis</h2><p>Rule-based data interpretation</p></div>
+      <div id="analysis" class="analysis">Select a location to generate an atmospheric assessment.</div>
+    </div>
+    <div class="card">
+      <div class="section-title"><h2>⚠️ Risk Signals</h2><p>Current indicators</p></div>
+      <div class="risk-grid">
+        <div class="risk"><span>Heat</span><b id="heatRisk">--</b></div>
+        <div class="risk"><span>Rain</span><b id="rainRisk">--</b></div>
+        <div class="risk"><span>Wind</span><b id="windRisk">--</b></div>
+        <div class="risk"><span>Humidity</span><b id="humidityRisk">--</b></div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    Data integration: Open-Meteo forecast, geocoding and historical weather services.<br>
+    Historical reanalysis can extend back to 1940; forecast data can extend up to 16 days depending on the service. This dashboard is an academic data-analysis project, not an official warning system.
+  </footer>
+</main>
+</div>
+
+<script>
+const state = {lat:null,lon:null,name:null,current:null,forecast:null,timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone,map:null,marker:null,hourlyChart:null,historyChart:null,trendChart:null};
+const MIN_DATE=WeatherValidation.MIN_DATE;
+const ARCHIVE_LAG_DAYS=WeatherValidation.ARCHIVE_LAG_DAYS;
+let MAX_DATE=WeatherValidation.getMaxDate(Date.now(),state.timeZone,ARCHIVE_LAG_DAYS);
+
+const weatherCodes = {
+  0:["Clear sky","☀️"],1:["Mainly clear","🌤️"],2:["Partly cloudy","⛅"],3:["Overcast","☁️"],
+  45:["Fog","🌫️"],48:["Rime fog","🌫️"],51:["Light drizzle","🌦️"],53:["Drizzle","🌦️"],55:["Dense drizzle","🌧️"],
+  61:["Slight rain","🌦️"],63:["Moderate rain","🌧️"],65:["Heavy rain","🌧️"],71:["Slight snow","🌨️"],
+  73:["Snow","❄️"],75:["Heavy snow","❄️"],80:["Rain showers","🌦️"],81:["Heavy showers","🌧️"],
+  82:["Violent showers","⛈️"],85:["Snow showers","🌨️"],86:["Heavy snow showers","❄️"],
+  95:["Thunderstorm","⛈️"],96:["Thunderstorm + hail","⛈️"],99:["Severe thunderstorm","⛈️"]
+};
+function codeInfo(c){return weatherCodes[c] || ["Weather update","🌍"]}
+function setStatus(t,bad=false){const e=document.getElementById("status");e.textContent=t;e.style.color=bad?"#ff9b9b":"#8faabd"}
+function fmt(n,d=1){return n==null?"--":Number(n).toFixed(d)}
+function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
+
+function initMap(){
+  state.map=L.map("map",{zoomControl:true}).setView([20,0],2);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap"}).addTo(state.map);
+}
+initMap();
+
+async function searchPlace(){
+  const q=document.getElementById("placeInput").value.trim();
+  if(!q){setStatus("Enter a place name first.",true);return}
+  setStatus("Finding the location and loading weather intelligence...");
+  try{
+    const r=await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=1&language=en&format=json`);
+    const j=await r.json();
+    if(!j.results?.length) throw new Error("Location not found.");
+    const p=j.results[0];
+    await selectPlace(p);
+  }catch(e){setStatus(e.message,true)}
+}
+async function selectPlace(p){
+  state.lat=p.latitude;state.lon=p.longitude;
+  state.name=[p.name,p.admin1,p.country].filter(Boolean).join(", ");
+  document.getElementById("placeName").textContent=state.name;
+  document.getElementById("placeMeta").textContent=`${p.timezone||"Local time"} • ${p.country_code||""}`;
+  document.getElementById("countryBadge").textContent=`Country: ${p.country||"--"}`;
+  document.getElementById("adminBadge").textContent=`Region: ${p.admin1||p.admin2||"--"}`;
+  document.getElementById("coordBadge").textContent=`Coordinates: ${fmt(p.latitude,4)}, ${fmt(p.longitude,4)}`;
+  state.map.setView([p.latitude,p.longitude],8);
+  if(state.marker)state.map.removeLayer(state.marker);
+  state.marker=L.marker([p.latitude,p.longitude]).addTo(state.map).bindPopup(`<b>${esc(state.name)}</b>`).openPopup();
+  await loadForecast();
+  state.timeZone=state.forecast.timezone||p.timezone||state.timeZone;
+  initializeHistoryInputs(true);
+  setStatus("Weather intelligence loaded.");
+}
+function toLocalDateInput(dateObj = new Date()){
+  const offset = dateObj.getTimezoneOffset();
+  const local = new Date(dateObj.getTime() - offset * 60000);
+  return local.toISOString().slice(0,10);
+}
+function addDays(date,days){return WeatherValidation.addDays(date,days)}
+function dayNumber(date){
+  const [year,month,day]=date.split("-").map(Number);
+  return new Date(Date.UTC(year,month-1,day)).getTime() / 86400000;
+}
+function locationDate(timestamp=Date.now()){
+  const parts=new Intl.DateTimeFormat("en-CA",{timeZone:state.timeZone,year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date(timestamp));
+  const values=Object.fromEntries(parts.filter(part=>part.type!=="literal").map(part=>[part.type,part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+function setFieldError(inputId,errorId,message){
+  const input=document.getElementById(inputId),error=document.getElementById(errorId);
+  input.setAttribute("aria-invalid",message?"true":"false");
+  error.textContent=message;
+}
+function initializeHistoryInputs(resetValues=false){
+  const now=Date.now(),maxDate=WeatherValidation.getMaxDate(now,state.timeZone,ARCHIVE_LAG_DAYS);
+  syncHistoryBounds(now,maxDate);
+  if(resetValues){
+    document.getElementById("histStart").value=addDays(maxDate,-7);
+    document.getElementById("histEnd").value=maxDate;
+    document.getElementById("histMomentDate").value=addDays(maxDate,-1);
+    document.getElementById("histMomentTime").value="12:00";
+  }
+  updateMomentTimeBounds(now);
+  refreshHistoryValidation(false);
+}
+function syncHistoryBounds(now=Date.now(),maxDate=WeatherValidation.getMaxDate(now,state.timeZone,ARCHIVE_LAG_DAYS)){
+  MAX_DATE=maxDate;
+  document.querySelectorAll("#history input[type=date]").forEach(input=>{
+    input.min=MIN_DATE;
+    input.max=maxDate;
+  });
+  document.getElementById("historyDateHelp").textContent=state.forecast
+    ?`Choose a date from ${MIN_DATE} through ${maxDate}.`
+    :"";
+}
+function updateMomentTimeBounds(now=Date.now()){
+  const date=document.getElementById("histMomentDate").value;
+  const bounds=WeatherValidation.getTimeBounds(date,now,state.timeZone,ARCHIVE_LAG_DAYS);
+  const time=document.getElementById("histMomentTime");
+  time.min=bounds.min;
+  time.max=bounds.max;
+}
+function refreshHistoryValidation(showErrors=true){
+  const now=Date.now();
+  syncHistoryBounds(now);
+  updateMomentTimeBounds(now);
+  const range=WeatherValidation.validateRange(
+    document.getElementById("histStart").value,
+    document.getElementById("histEnd").value,
+    document.getElementById("histType").value,
+    now,state.timeZone,ARCHIVE_LAG_DAYS
+  );
+  const momentDate=document.getElementById("histMomentDate").value;
+  const momentTime=document.getElementById("histMomentTime").value;
+  const moment=WeatherValidation.validateMoment(momentDate,momentTime,now,state.timeZone,ARCHIVE_LAG_DAYS);
+  const parsedMomentDate=WeatherValidation.parseDate(momentDate);
+  const rangeMomentDateError=WeatherValidation.dateError(momentDate,MAX_DATE);
+  const momentDateError=!parsedMomentDate.valid
+    ?(momentDate?parsedMomentDate.error:"Choose a date.")
+    :(!moment.valid&&moment.error===rangeMomentDateError?moment.error:"");
+  const momentTimeError=momentDateError?"":moment.error;
+  if(showErrors){
+    setFieldError("histStart","histStartError",range.errors.start);
+    setFieldError("histEnd","histEndError",range.errors.end);
+    setFieldError("histMomentDate","histMomentDateError",momentDateError);
+    setFieldError("histMomentTime","histMomentTimeError",momentTimeError);
+  }
+  const allValid=range.valid&&moment.valid;
+  document.getElementById("analyzePastButton").disabled=!allValid||!state.forecast;
+  document.getElementById("analyzeHourButton").disabled=!allValid||!state.forecast;
+  return {rangeValid:range.valid,momentValid:moment.valid};
+}
+function clearHistoryResults(){
+  document.getElementById("historyMessage").textContent="";
+  document.getElementById("historyTable").innerHTML="";
+  if(state.historyChart){state.historyChart.destroy();state.historyChart=null}
+}
+function clearMomentResult(){
+  document.getElementById("historyMoment").textContent="Select a location, date, and time to inspect a past weather moment.";
+}
+function onHistoryInputChange(){
+  updateMomentTimeBounds();
+  const result=refreshHistoryValidation(true);
+  if(!result.rangeValid||!result.momentValid){
+    clearHistoryResults();
+    clearMomentResult();
+  }
+}
+function useGPS(){
+  if(!navigator.geolocation){setStatus("Geolocation is not supported by this browser.",true);return}
+  setStatus("Requesting browser location permission...");
+  navigator.geolocation.getCurrentPosition(async pos=>{
+    const r=await fetch(`https://geocoding-api.open-meteo.com/v1/reverse?latitude=${pos.coords.latitude}&longitude=${pos.coords.longitude}&language=en&format=json`);
+    const j=await r.json();
+    const p=j.results?.[0]||{latitude:pos.coords.latitude,longitude:pos.coords.longitude,name:"Current Location"};
+    await selectPlace(p);
+  },()=>setStatus("Location permission was denied or unavailable.",true));
+}
+
+async function loadForecast(){
+  const u=`https://api.open-meteo.com/v1/forecast?latitude=${state.lat}&longitude=${state.lon}`+
+    `&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,wind_speed_10m,pressure_msl,cloud_cover,weather_code`+
+    `&hourly=temperature_2m,relative_humidity_2m,precipitation,precipitation_probability,wind_speed_10m,pressure_msl,cloud_cover,weather_code`+
+    `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,sunrise,sunset`+
+    `&forecast_days=16&timezone=auto`;
+  const r=await fetch(u); if(!r.ok)throw new Error("Forecast service failed.");
+  state.forecast=await r.json();state.current=state.forecast.current;
+  renderCurrent();renderHourly();renderForecast();renderAnalysis();
+}
+function renderCurrent(){
+  const c=state.current, [desc,icon]=codeInfo(c.weather_code);
+  document.getElementById("currentIcon").textContent=icon;
+  document.getElementById("currentTemp").innerHTML=`${fmt(c.temperature_2m)} <span>°C</span>`;
+  document.getElementById("currentDesc").textContent=desc;
+  document.getElementById("feels").textContent=`${fmt(c.apparent_temperature)} °C`;
+  document.getElementById("humidity").textContent=`${fmt(c.relative_humidity_2m,0)} %`;
+  document.getElementById("wind").textContent=`${fmt(c.wind_speed_10m)} km/h`;
+  document.getElementById("pressure").textContent=`${fmt(c.pressure_msl,0)} hPa`;
+  document.getElementById("cloud").textContent=`${fmt(c.cloud_cover,0)} %`;
+  document.getElementById("rainNow").textContent=`${fmt(c.precipitation)} mm`;
+  const heat=c.temperature_2m>=38?"High":c.temperature_2m>=33?"Moderate":"Low";
+  const rain=c.precipitation>5?"High":c.precipitation>0?"Moderate":"Low";
+  const wind=c.wind_speed_10m>=45?"High":c.wind_speed_10m>=25?"Moderate":"Low";
+  const hum=c.relative_humidity_2m>=85?"High":c.relative_humidity_2m>=65?"Moderate":"Low";
+  setRisk("heatRisk",heat);setRisk("rainRisk",rain);setRisk("windRisk",wind);setRisk("humidityRisk",hum);
+}
+function setRisk(id,v){const e=document.getElementById(id);e.textContent=v;e.className=v==="High"?"bad":v==="Moderate"?"warn":"good"}
+
+function chartBase(){
+  return {responsive:true,maintainAspectRatio:false,interaction:{mode:"index",intersect:false},
+    plugins:{legend:{labels:{color:"#a9c1cd"}},tooltip:{backgroundColor:"#09202d"}},
+    scales:{x:{ticks:{color:"#7895a5",maxTicksLimit:12},grid:{display:false}},
+            y:{ticks:{color:"#7895a5"},grid:{color:"rgba(130,170,190,.12)"}}}}
+}
+function renderHourly(){
+  const h=state.forecast.hourly,n=72,labels=h.time.slice(0,n).map(x=>x.slice(11,16));
+  if(state.hourlyChart)state.hourlyChart.destroy();
+  state.hourlyChart=new Chart(document.getElementById("hourlyChart"),{type:"line",
+    data:{labels,datasets:[
+      {label:"Temperature °C",data:h.temperature_2m.slice(0,n),borderColor:"#36d6e7",backgroundColor:"rgba(54,214,231,.10)",fill:true,tension:.35,pointRadius:0},
+      {label:"Humidity %",data:h.relative_humidity_2m.slice(0,n),borderColor:"#4e9dff",tension:.35,pointRadius:0},
+      {label:"Wind km/h",data:h.wind_speed_10m.slice(0,n),borderColor:"#ffc857",tension:.35,pointRadius:0}
+    ]},options:chartBase()});
+}
+function renderForecast(){
+  const d=state.forecast.daily,box=document.getElementById("forecastGrid");box.innerHTML="";
+  for(let i=0;i<d.time.length;i++){
+    const [desc,icon]=codeInfo(d.weather_code[i]);
+    box.innerHTML+=`<div class="day"><b>${new Date(d.time[i]).toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"})}</b>
+      <div class="icon">${icon}</div><div class="temp">${fmt(d.temperature_2m_max[i])}° / ${fmt(d.temperature_2m_min[i])}°</div>
+      <small>${desc}<br>🌧 ${fmt(d.precipitation_probability_max[i],0)}% rain<br>💧 ${fmt(d.precipitation_sum[i])} mm<br>💨 ${fmt(d.wind_speed_10m_max[i])} km/h</small></div>`;
+  }
+}
+function renderAnalysis(){
+  const c=state.current;
+  let s=`<b>${codeInfo(c.weather_code)[0]}</b> is currently observed in ${esc(state.name)}. `;
+  if(c.temperature_2m>=35)s+="Temperature is very high, so heat exposure is the dominant signal. ";
+  else if(c.temperature_2m>=30)s+="Warm conditions are likely to remain noticeable during the daytime. ";
+  else if(c.temperature_2m<=15)s+="Cool conditions dominate the current profile. ";
+  else s+="The temperature is within a moderate range. ";
+  if(c.relative_humidity_2m>=80)s+="High humidity may make the air feel heavier. ";
+  if(c.precipitation>0)s+="Precipitation is currently detected. ";
+  if(c.wind_speed_10m>=40)s+="Strong winds may affect outdoor comfort and travel. ";
+  s+=`Pressure is ${fmt(c.pressure_msl,0)} hPa with ${fmt(c.cloud_cover,0)}% cloud cover.`;
+  document.getElementById("analysis").innerHTML=s;
+}
+
+async function loadHistory(){
+  const validation=refreshHistoryValidation(true);
+  if(!validation.rangeValid||!validation.momentValid)return;
+  if(state.lat==null||!state.forecast){document.getElementById("historyMessage").textContent="Select a location first.";return}
+  const start=document.getElementById("histStart").value,end=document.getElementById("histEnd").value,type=document.getElementById("histType").value;
+  const vars=type==="hourly"?"temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m,pressure_msl,cloud_cover,weather_code":"temperature_2m_mean,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max";
+  const msg=document.getElementById("historyMessage");msg.textContent="Loading historical weather...";
+  try{
+    const params=new URLSearchParams({latitude:state.lat,longitude:state.lon,start_date:start,end_date:end,timezone:state.forecast.timezone||"auto"});
+    params.set(type==="hourly"?"hourly":"daily",vars);
+    const r=await fetch(`https://archive-api.open-meteo.com/v1/archive?${params}`);
+    const j=await r.json();
+    if(!r.ok||j.error)throw new Error(j.reason||"Historical service failed. Try a shorter date range or a date further in the past.");
+    renderHistory(j,type);
+    msg.textContent=`Historical ${type==="hourly"?"hourly":"daily"} analysis loaded for ${start} → ${end}.`;
+  }catch(e){msg.textContent=e.message||"Unable to load historical weather."}
+}
+async function analyzeHistoricalMoment(){
+  const validation=refreshHistoryValidation(true);
+  if(!validation.rangeValid||!validation.momentValid)return;
+  const output=document.getElementById("historyMoment");
+  if(state.lat==null||!state.forecast){output.textContent="Search and select a location first.";return}
+
+  const date=document.getElementById("histMomentDate").value;
+  const time=document.getElementById("histMomentTime").value;
+  const today=locationDate();
+  const target=`${date}T${time}`;
+  output.textContent="Loading the selected historical hour...";
+
+  try{
+    const variables="temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,wind_speed_10m,pressure_msl,cloud_cover,weather_code";
+    const dateAge=dayNumber(date)-dayNumber(today);
+    let historical,source;
+
+    if(dateAge>=-92){
+      const params=new URLSearchParams({
+        latitude:state.lat,
+        longitude:state.lon,
+        past_days:"92",
+        forecast_days:"1",
+        hourly:variables,
+        timezone:state.forecast.timezone||"auto"
+      });
+      const response=await fetch(`https://api.open-meteo.com/v1/forecast?${params}`);
+      const data=await response.json();
+      if(!response.ok||data.error)throw new Error(data.reason||"Recent historical weather service is unavailable.");
+      historical=data;
+      source="Recent model reanalysis";
+    }else{
+      const params=new URLSearchParams({
+        latitude:state.lat,
+        longitude:state.lon,
+        start_date:date,
+        end_date:date,
+        hourly:variables,
+        timezone:state.forecast.timezone||"auto"
+      });
+      const response=await fetch(`https://archive-api.open-meteo.com/v1/archive?${params}`);
+      const data=await response.json();
+      if(!response.ok||data.error)throw new Error(data.reason||"Historical archive is unavailable for that date.");
+      historical=data;
+      source="Historical reanalysis";
+    }
+
+    const h=historical.hourly;
+    if(!h?.time?.length)throw new Error("No hourly history was returned for this date.");
+    const index=h.time.findIndex(value=>value.slice(0,16)===target);
+    if(index<0)throw new Error("No observation exists for that local hour. Historical data is hourly, so choose a time ending in :00.");
+
+    const field=(key,unit="")=>{
+      const value=h[key]?.[index];
+      return value==null?"Not available":`${fmt(value)}${unit}`;
+    };
+    const [description,icon]=codeInfo(h.weather_code?.[index]);
+    output.innerHTML=`<b>${icon} ${esc(state.name)} · ${date} ${time}</b><br>
+      <span>${esc(description)} · ${source}</span><br><br>
+      🌡️ Temperature: <b>${field("temperature_2m"," °C")}</b><br>
+      🌡️ Feels like: <b>${field("apparent_temperature"," °C")}</b><br>
+      💧 Humidity: <b>${field("relative_humidity_2m"," %")}</b><br>
+      🌧️ Precipitation: <b>${field("precipitation"," mm")}</b><br>
+      💨 Wind: <b>${field("wind_speed_10m"," km/h")}</b><br>
+      📊 Pressure: <b>${field("pressure_msl"," hPa")}</b><br>
+      ☁️ Cloud cover: <b>${field("cloud_cover"," %")}</b><br><br>
+      Historical weather is a model-based reanalysis estimate, not a guaranteed observation from a station at the selected coordinates.`;
+  }catch(error){
+    output.textContent=error.message||"Unable to load this historical hour.";
+  }
+}
+function renderHistory(j,type){
+  const obj=type==="hourly"?j.hourly:j.daily;
+  const labels=obj.time.map(x=>type==="hourly"?x.slice(5,16).replace("T"," "):x);
+  const temps=type==="hourly"?obj.temperature_2m:obj.temperature_2m_mean;
+  const rain=type==="hourly"?obj.precipitation:obj.precipitation_sum;
+  if(state.historyChart)state.historyChart.destroy();
+  state.historyChart=new Chart(document.getElementById("historyChart"),{type:"line",data:{labels,datasets:[
+    {label:"Temperature °C",data:temps,borderColor:"#36d6e7",backgroundColor:"rgba(54,214,231,.10)",fill:true,tension:.2,pointRadius:0,yAxisID:"y"},
+    {label:"Precipitation mm",data:rain,type:"bar",backgroundColor:"rgba(78,157,255,.45)",yAxisID:"y1"}
+  ]},options:{...chartBase(),scales:{...chartBase().scales,y:{...chartBase().scales.y,title:{display:true,text:"Temperature °C"}},y1:{position:"right",ticks:{color:"#7895a5"},grid:{drawOnChartArea:false},title:{display:true,text:"Rain mm"}}}}});
+  const step=Math.max(1,Math.floor(obj.time.length/10)),rows=[];
+  for(let i=0;i<obj.time.length;i+=step){
+    rows.push(`<tr><td>${obj.time[i]}</td><td>${fmt(temps[i])} °C</td><td>${fmt(rain[i])} mm</td></tr>`);
+  }
+  document.getElementById("historyTable").innerHTML=`<div class="table-wrap"><table><thead><tr><th>Time / Date</th><th>Temperature</th><th>Precipitation</th></tr></thead><tbody>${rows.join("")}</tbody></table></div>`;
+}
+
+async function loadTrend(){
+  if(state.lat==null){document.getElementById("trendMessage").textContent="Select a location first.";return}
+  const a=+document.getElementById("trendStart").value,b=+document.getElementById("trendEnd").value,metric=document.getElementById("trendMetric").value;
+  if(a<1940||b<a){document.getElementById("trendMessage").textContent="Choose a valid year range (1940 or later).";return}
+  document.getElementById("trendMessage").textContent="Loading daily historical data and calculating yearly averages...";
+  const url=`https://archive-api.open-meteo.com/v1/archive?latitude=${state.lat}&longitude=${state.lon}&start_date=${a}-01-01&end_date=${b}-12-31&daily=temperature_2m_mean,precipitation_sum&timezone=auto`;
+  try{
+    const r=await fetch(url);if(!r.ok)throw new Error("Trend service failed. Try a smaller year range.");
+    const j=await r.json(), years={},d=j.daily;
+    for(let i=0;i<d.time.length;i++){const y=d.time[i].slice(0,4);(years[y]??=[]).push(metric==="temp"?d.temperature_2m_mean[i]:d.precipitation_sum[i])}
+    const labels=Object.keys(years),values=labels.map(y=>{const arr=years[y].filter(x=>x!=null);return metric==="temp"?arr.reduce((s,x)=>s+x,0)/arr.length:arr.reduce((s,x)=>s+x,0)});
+    if(state.trendChart)state.trendChart.destroy();
+    state.trendChart=new Chart(document.getElementById("trendChart"),{type:"line",data:{labels,datasets:[{label:metric==="temp"?"Annual mean temperature °C":"Annual precipitation mm",data:values,borderColor:"#55d68a",backgroundColor:"rgba(85,214,138,.10)",fill:true,tension:.25,pointRadius:2}]},options:chartBase()});
+    const first=values[0],last=values[values.length-1],delta=last-first;
+    document.getElementById("trendMessage").textContent=`Trend calculated for ${labels[0]}–${labels[labels.length-1]}. Change from first to last available year: ${fmt(delta,2)} ${metric==="temp"?"°C":"mm"}.`;
+  }catch(e){document.getElementById("trendMessage").textContent=e.message}
+}
+
+// Defaults
+initializeHistoryInputs(true);
+document.querySelectorAll("#histStart,#histEnd,#histType,#histMomentDate,#histMomentTime").forEach(input=>{
+  input.addEventListener("input",onHistoryInputChange);
+  input.addEventListener("change",onHistoryInputChange);
+  input.addEventListener("blur",onHistoryInputChange);
+});
+document.getElementById("placeInput").addEventListener("keydown",e=>{if(e.key==="Enter")searchPlace()});
+</script>
+</body>
+</html>
+                                                                                                       weather intelligence
